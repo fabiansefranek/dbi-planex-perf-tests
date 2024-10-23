@@ -1,0 +1,21 @@
+{
+  "id": "int",
+  "name": "string",
+  "identifier": "string",
+  "invite_code": "string",
+  "sprint_duration": "int",
+  "owner": [
+    {
+      "username": "string",
+      "first_name": "string",
+      "last_name": "string"
+    }
+  ],
+  "sprints": [
+    {
+      "name": "string",
+      "start_date": "string",
+      "end_date": "string"
+    }
+  ]
+}
