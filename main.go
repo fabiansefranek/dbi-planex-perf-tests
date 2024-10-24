@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"math/rand"
 	"os"
@@ -18,6 +19,7 @@ import (
 )
 
 func main() {
+	println("Starting Postgres container...")
 	postgresConnectionString, postgresContainer, err := StartPostgres()
 	if err != nil {
 		panic(err)
@@ -30,11 +32,13 @@ func main() {
 	}
 	defer postgresConn.Close(context.Background())
 
+	println("Initializing Postgres...")
 	err = InitializePostgres(postgresConn)
 	if err != nil {
 		panic(err)
 	}
 
+	println("Starting MongoDB container...")
 	mongoConnectionString, mongoContainer, err := StartMongoDB()
 	if err != nil {
 		panic(err)
@@ -57,111 +61,116 @@ func main() {
 		}
 	}()
 
-	err = InitializeMongoDB(mongoConn)
-	if err != nil {
-		panic(err)
-	}
-
-	projects := GenerateProjects(10000)
+	sizes := []int{100, 1000, 100000}
 	tableRows := make([][]string, 0)
 
-	/* PERFORMANCE TESTS */
+	println("Starting performance tests...")
+	for _, size := range sizes {
+		sizeAsString := fmt.Sprint(size)
 
-	/* insert */
+		projects := GenerateProjects(size)
+		/* PERFORMANCE TESTS */
 
-	postgresDuration, err := InsertPostgres(postgresConn, projects)
-	if err != nil {
-		panic(err)
+		/* insert */
+		postgresDuration, err := InsertPostgres(postgresConn, projects)
+		if err != nil {
+			panic(err)
+		}
+
+		mongoDuration, err := InsertMongo(mongoConn, projects)
+		if err != nil {
+			panic(err)
+		}
+
+		tableRows = append(tableRows, []string{sizeAsString, "Insert", postgresDuration, mongoDuration})
+
+		/* find */
+
+		postgresDuration, err = FindPostgres(postgresConn)
+		if err != nil {
+			panic(err)
+		}
+
+		mongoDuration, err = FindMongo(mongoConn)
+		if err != nil {
+			panic(err)
+		}
+
+		tableRows = append(tableRows, []string{sizeAsString, "Find", postgresDuration, mongoDuration})
+
+		postgresDuration, err = FindPostgresWithFilter(postgresConn)
+		if err != nil {
+			panic(err)
+		}
+
+		mongoDuration, err = FindMongoWithFilter(mongoConn)
+		if err != nil {
+			panic(err)
+		}
+
+		tableRows = append(tableRows, []string{sizeAsString, "Find with filter", postgresDuration, mongoDuration})
+
+		postgresDuration, err = FindPostgresWithFilterAndProjection(postgresConn)
+		if err != nil {
+			panic(err)
+		}
+
+		mongoDuration, err = FindMongoWithFilterAndProjection(mongoConn)
+		if err != nil {
+			panic(err)
+		}
+
+		tableRows = append(tableRows, []string{sizeAsString, "Find with filter and projection", postgresDuration, mongoDuration})
+
+		postgresDuration, err = FindPostgresWithFilterAndProjectionAndSort(postgresConn)
+		if err != nil {
+			panic(err)
+		}
+
+		mongoDuration, err = FindMongoWithFilterAndProjectionAndSort(mongoConn)
+		if err != nil {
+			panic(err)
+		}
+
+		tableRows = append(tableRows, []string{sizeAsString, "Find with filter and projection and sort", postgresDuration, mongoDuration})
+
+		/* update */
+
+		postgresDuration, err = UpdatePostgres(postgresConn)
+		if err != nil {
+			panic(err)
+		}
+
+		mongoDuration, err = UpdateMongo(mongoConn)
+		if err != nil {
+			panic(err)
+		}
+
+		tableRows = append(tableRows, []string{sizeAsString, "Update", postgresDuration, mongoDuration})
+
+		/* delete */
+
+		postgresDuration, err = DeletePostgres(postgresConn)
+		if err != nil {
+			panic(err)
+		}
+
+		mongoDuration, err = DeleteMongo(mongoConn)
+		if err != nil {
+			panic(err)
+		}
+		
+		tableRows = append(tableRows, []string{sizeAsString, "Delete", postgresDuration, mongoDuration})
+
+		tableRows = append(tableRows, []string{})
+
+		println("Finished test size ", size)
 	}
-
-	mongoDuration, err := InsertMongo(mongoConn, projects)
-	if err != nil {
-		panic(err)
-	}
-
-	tableRows = append(tableRows, []string{"Insert", postgresDuration, mongoDuration})
-
-	/* find */
-
-	postgresDuration, err = FindPostgres(postgresConn)
-	if err != nil {
-		panic(err)
-	}
-
-	mongoDuration, err = FindMongo(mongoConn)
-	if err != nil {
-		panic(err)
-	}
-
-	tableRows = append(tableRows, []string{"Find", postgresDuration, mongoDuration})
-
-	postgresDuration, err = FindPostgresWithFilter(postgresConn)
-	if err != nil {
-		panic(err)
-	}
-
-	mongoDuration, err = FindMongoWithFilter(mongoConn)
-	if err != nil {
-		panic(err)
-	}
-
-	tableRows = append(tableRows, []string{"Find with filter", postgresDuration, mongoDuration})
-
-	postgresDuration, err = FindPostgresWithFilterAndProjection(postgresConn)
-	if err != nil {
-		panic(err)
-	}
-
-	mongoDuration, err = FindMongoWithFilterAndProjection(mongoConn)
-	if err != nil {
-		panic(err)
-	}
-
-	tableRows = append(tableRows, []string{"Find with filter and projection", postgresDuration, mongoDuration})
-
-	postgresDuration, err = FindPostgresWithFilterAndProjectionAndSort(postgresConn)
-	if err != nil {
-		panic(err)
-	}
-
-	mongoDuration, err = FindMongoWithFilterAndProjectionAndSort(mongoConn)
-	if err != nil {
-		panic(err)
-	}
-
-	tableRows = append(tableRows, []string{"Find with filter and projection and sort", postgresDuration, mongoDuration})
-
-	/* update */
-
-	postgresDuration, err = UpdatePostgres(postgresConn)
-	if err != nil {
-		panic(err)
-	}
-
-	mongoDuration, err = UpdateMongo(mongoConn)
-	if err != nil {
-		panic(err)
-	}
-
-	tableRows = append(tableRows, []string{"Update", postgresDuration, mongoDuration})
-
-	/* delete */
-
-	postgresDuration, err = DeletePostgres(postgresConn)
-	if err != nil {
-		panic(err)
-	}
-
-	mongoDuration, err = DeleteMongo(mongoConn)
-	if err != nil {
-		panic(err)
-	}
-	
-	tableRows = append(tableRows, []string{"Delete", postgresDuration, mongoDuration})
-
 	/* TABLE */
 
 	PrintTable(tableRows)
+
+	println("Performance tests finished")
 
 	time.Sleep(1 * time.Hour) 
 }
@@ -265,7 +274,7 @@ func InitializePostgres(conn *pgx.Conn) (err error) {
 
 func StartMongoDB() (connectionString string, container *mongodb.MongoDBContainer, err error) {
 	ctx := context.Background()
-	mongodbContainer, err := mongodb.Run(ctx, "mongo:6", mongodb.WithUsername("user"), mongodb.WithPassword("password"))
+	mongodbContainer, err := mongodb.Run(ctx, "mongo:latest", mongodb.WithUsername("user"), mongodb.WithPassword("password"))
 
 	if err != nil {
 		return "", nil, err
@@ -286,16 +295,6 @@ func ConnectMongoDB(connectionString string) (client *mongo.Client, err error) {
 	}
 
 	return client, nil
-}
-
-func InitializeMongoDB(client *mongo.Client) (err error) {
-	ctx := context.Background()
-	_, err = client.Database("test").Collection("users").InsertOne(ctx, bson.M{"username": "test", "password": "test", "first_name": "test", "last_name": "test"})
-	if err != nil {
-		return err
-	}
-
-	return nil
 }
 
 /* SEEDER */
@@ -600,7 +599,11 @@ func PrintTable(rows [][]string) {
 	t.SetOutputMirror(os.Stdout)
 	t.AppendHeader(table.Row{"#", "Query", "Postgres", "Mongo"})
 	for _, row := range rows {
-		t.AppendRow(table.Row{1000, row[0], row[1], row[2]})
+		if len(row) != 4 {
+			t.AppendSeparator()
+			continue
+		}
+		t.AppendRow(table.Row{row[0], row[1], row[2], row[3]})
 	}
 	t.Render()
 }
