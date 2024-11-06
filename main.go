@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"math/rand"
@@ -65,6 +66,8 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	
+	InsertMongoSchemaViolation(mongoConn)
 
 	sizes := []int{100, 1000, 100000}
 	tableRows := make([][]string, 0)
@@ -212,6 +215,9 @@ func main() {
 
 	println("Performance tests finished")
 
+	// SCHEMA VALIDATION TEST
+
+
 	time.Sleep(1 * time.Hour) 
 }
 
@@ -338,7 +344,80 @@ func ConnectMongoDB(connectionString string) (client *mongo.Client, err error) {
 }
 
 func InitializeMongoDB(client *mongo.Client) (err error) {
+	validator := bson.M{
+		"$jsonSchema": bson.M{
+			"bsonType": "object",
+			"required": []string{"name", "identifier", "invite_code", "sprint_duration", "owner", "sprints"},
+			"properties": bson.M{
+				"id": bson.M{
+					"bsonType": "int",
+				},
+				"name": bson.M{
+					"bsonType":    "string",
+					"description": "The project name",
+				},
+				"identifier": bson.M{
+					"bsonType":    "string",
+					"description": "Unique project identifier",
+				},
+				"invite_code": bson.M{
+					"bsonType":    "string",
+					"description": "Code used to invite others to the project",
+				},
+				"sprint_duration": bson.M{
+					"bsonType":    "int",
+					"description": "The duration of a sprint",
+				},
+				"owner": bson.M{
+					"bsonType": "object",
+					"items": bson.M{
+						"bsonType": "object",
+						"required": []string{"username", "first_name", "last_name"},
+						"properties": bson.M{
+							"username": bson.M{
+								"bsonType": "string",
+							},
+							"first_name": bson.M{
+								"bsonType": "string",
+							},
+							"last_name": bson.M{
+								"bsonType": "string",
+							},
+						},
+					},
+				},
+				"sprints": bson.M{
+					"bsonType": "array",
+					"items": bson.M{
+						"bsonType": "object",
+						"required": []string{"name", "start_date", "end_date"},
+						"properties": bson.M{
+							"name": bson.M{
+								"bsonType": "string",
+							},
+							"start_date": bson.M{
+								"bsonType": "long", 
+							},
+							"end_date": bson.M{
+								"bsonType": "long",
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	
+	err = client.Database("test").CreateCollection(context.Background(), "projects_index", &options.CreateCollectionOptions{
+		Validator: &validator,
+	})
+	if err != nil {
+		return err
+	}
+
 	coll := client.Database("test").Collection("projects_index")
+
 	indexModel := mongo.IndexModel{
 		Keys: bson.D{{Key: "sprint_duration", Value: 1}},
 	}
@@ -528,6 +607,31 @@ func InsertMongo(client *mongo.Client, projects []Project, collection string) (d
 		}
 	}
 	return time.Since(now).String(), nil
+}
+
+func InsertMongoSchemaViolation(client *mongo.Client) (err error) {
+	_, err = client.Database("test").Collection("projects_index").InsertOne(context.Background(), bson.M{
+		"identifier": "PX",
+		"invite_code": "AS)D(Zaihz2e)",
+		"owner": bson.M{
+			"username": "maxmuster",
+			"first_name": "Max",
+			"last_name": "Muster",
+		},
+		"sprints": bson.A{
+			bson.M{
+				"name": "Sprint 1",
+				"start_date": 0,
+				"end_date": 1,
+			},
+		},
+	})
+	if err == nil {
+		return errors.New("Insert is not violating schema, but should")
+	}
+
+	println("Test Insert successfully violated schema")
+	return nil
 }
 
 func FindMongo(client *mongo.Client, collection string) (duration string, err error) {
