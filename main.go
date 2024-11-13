@@ -19,6 +19,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+const (
+	atlasConnectionString = "mongodb+srv://dbi:dbi@cluster0.rmuwo.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
+)
+
 func main() {
 	println("Starting Postgres container...")
 	postgresConnectionString, postgresContainer, err := StartPostgres()
@@ -52,7 +56,7 @@ func main() {
 		}
 	}()
 
-	mongoConn, err := ConnectMongoDB(mongoConnectionString)
+	mongoConn, err := ConnectMongoDB(mongoConnectionString, false)
 	if err != nil {
 		panic(err)
 	}
@@ -69,7 +73,9 @@ func main() {
 	
 	InsertMongoSchemaViolation(mongoConn)
 
-	sizes := []int{100, 1000, 100000}
+	mongoAtlasConn, err := ConnectMongoDB(atlasConnectionString, true)
+
+	sizes := []int{100, 1000, 10000}
 	tableRows := make([][]string, 0)
 
 	println("Starting performance tests...")
@@ -95,7 +101,12 @@ func main() {
 			panic(err)
 		}
 
-		tableRows = append(tableRows, []string{sizeAsString, "Insert", postgresDuration, mongoDuration, mongoDurationWithIndex})
+		mongoDurationAtlas, err := InsertMongo(mongoAtlasConn, projects, "projects")
+		if err != nil {
+			panic(err)
+		}
+
+		tableRows = append(tableRows, []string{sizeAsString, "Insert", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas})
 
 		/* find */
 
@@ -114,7 +125,9 @@ func main() {
 			panic(err)
 		}
 
-		tableRows = append(tableRows, []string{sizeAsString, "Find", postgresDuration, mongoDuration, mongoDurationWithIndex})
+		mongoDurationAtlas, err = FindMongo(mongoAtlasConn, "projects")
+
+		tableRows = append(tableRows, []string{sizeAsString, "Find", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas})
 
 		postgresDuration, err = FindPostgresWithFilter(postgresConn)
 		if err != nil {
@@ -131,7 +144,9 @@ func main() {
 			panic(err)
 		}
 
-		tableRows = append(tableRows, []string{sizeAsString, "Find with filter", postgresDuration, mongoDuration, mongoDurationWithIndex})
+		mongoDuration, err = FindMongoWithFilter(mongoAtlasConn, "projects")
+
+		tableRows = append(tableRows, []string{sizeAsString, "Find with filter", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas})
 
 		postgresDuration, err = FindPostgresWithFilterAndProjection(postgresConn)
 		if err != nil {
@@ -148,7 +163,9 @@ func main() {
 			panic(err)
 		}
 
-		tableRows = append(tableRows, []string{sizeAsString, "Find with filter and projection", postgresDuration, mongoDuration, mongoDurationWithIndex})
+		mongoDuration, err = FindMongoWithFilterAndProjection(mongoAtlasConn, "projects")
+
+		tableRows = append(tableRows, []string{sizeAsString, "Find with filter and projection", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas})
 
 		postgresDuration, err = FindPostgresWithFilterAndProjectionAndSort(postgresConn)
 		if err != nil {
@@ -165,7 +182,9 @@ func main() {
 			panic(err)
 		}
 
-		tableRows = append(tableRows, []string{sizeAsString, "Find with filter and projection and sort", postgresDuration, mongoDuration, mongoDurationWithIndex})
+		mongoDurationAtlas, err = FindMongoWithFilterAndProjectionAndSort(mongoAtlasConn, "projects")
+
+		tableRows = append(tableRows, []string{sizeAsString, "Find with filter and projection and sort", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas})
 
 		/* update */
 
@@ -184,7 +203,9 @@ func main() {
 			panic(err)
 		}
 
-		tableRows = append(tableRows, []string{sizeAsString, "Update", postgresDuration, mongoDuration, mongoDurationWithIndex})
+		mongoDurationAtlas, err = UpdateMongo(mongoAtlasConn, "projects")
+
+		tableRows = append(tableRows, []string{sizeAsString, "Update", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas})
 
 		/* delete */
 
@@ -202,8 +223,10 @@ func main() {
 		if err != nil {
 			panic(err)
 		}
+
+		mongoDurationAtlas, err = DeleteMongo(mongoAtlasConn, "projects")
 		
-		tableRows = append(tableRows, []string{sizeAsString, "Delete", postgresDuration, mongoDuration, mongoDurationWithIndex})
+		tableRows = append(tableRows, []string{sizeAsString, "Delete", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas})
 
 		tableRows = append(tableRows, []string{})
 
@@ -334,8 +357,12 @@ func StartMongoDB() (connectionString string, container *mongodb.MongoDBContaine
 	return connectionString, mongodbContainer, nil
 }
 
-func ConnectMongoDB(connectionString string) (client *mongo.Client, err error) {
-	client, err = mongo.Connect(context.Background(),options.Client().ApplyURI(connectionString))
+func ConnectMongoDB(connectionString string, atlas bool) (client *mongo.Client, err error) {
+	opts := options.Client().ApplyURI(connectionString)
+	if (atlas) {
+		opts = opts.SetServerAPIOptions(options.ServerAPI(options.ServerAPIVersion1))
+	}
+	client, err = mongo.Connect(context.Background(), opts)
 	if err != nil {
 		return nil, err
 	}
@@ -754,13 +781,13 @@ func DeleteMongo(client *mongo.Client, collection string) (duration string, err 
 func PrintTable(rows [][]string) {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"#", "Query", "Postgres", "Mongo", "Mongo (Index)"})
+	t.AppendHeader(table.Row{"#", "Query", "Postgres", "Mongo", "Mongo (Index)", "Mongo (Atlas)"})
 	for _, row := range rows {
-		if len(row) != 5 {
+		if len(row) != 6 {
 			t.AppendSeparator()
 			continue
 		}
-		t.AppendRow(table.Row{row[0], row[1], row[2], row[3], row[4]})
+		t.AppendRow(table.Row{row[0], row[1], row[2], row[3], row[4], row[5]})
 	}
 	t.Render()
 }
