@@ -1,0 +1,27 @@
+Project
+{
+  "_id": "string",
+  "name": "string",
+  "identifier": "string",
+  "invite_code": "string",
+  "sprint_duration": "int",
+  "owner": "owner_id"
+}
+
+
+Owner
+{
+  "_id": "string",
+  "username": "string",
+  "first_name": "string",
+  "last_name": "string"
+}
+
+Sprint
+{
+  "_id": "string",
+  "name": "string",
+  "start_date": "string",
+  "end_date": "string",
+  "project": "project_id"
+}

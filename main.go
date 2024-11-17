@@ -83,7 +83,7 @@ func main() {
 
 	/* --- PERFORMANCE TESTS --- */
 
-	sizes := []int{100, 1000, 10000}
+	sizes := []int{100, 1000/*, 10000*/}
 	tableRows := make([][]string, 0)
 
 	println("Starting performance tests...")
@@ -113,7 +113,12 @@ func main() {
 			panic(err)
 		}
 
-		tableRows = append(tableRows, []string{sizeAsString, "Insert", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas})
+		mongoDurationReferencing, err := InsertMongoWithReferencing(mongoConn, projects)
+		if err != nil {
+			panic(err)
+		}
+
+		tableRows = append(tableRows, []string{sizeAsString, "Insert", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas, mongoDurationReferencing})
 
 		/* FIND */
 
@@ -133,8 +138,16 @@ func main() {
 		}
 
 		mongoDurationAtlas, err = FindMongo(mongoAtlasConn, "projects")
+		if err != nil {
+			panic(err)
+		}
 
-		tableRows = append(tableRows, []string{sizeAsString, "Find", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas})
+		mongoDurationReferencing, err = FindMongoWithReferencing(mongoConn)
+		if err != nil {
+			panic(err)
+		}
+
+		tableRows = append(tableRows, []string{sizeAsString, "Find", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas, mongoDurationReferencing})
 
 		postgresDuration, err = FindPostgresWithFilter(postgresConn)
 		if err != nil {
@@ -151,9 +164,17 @@ func main() {
 			panic(err)
 		}
 
-		mongoDuration, err = FindMongoWithFilter(mongoAtlasConn, "projects")
+		mongoDurationAtlas, err = FindMongoWithFilter(mongoAtlasConn, "projects")
+		if err != nil {
+			panic(err)
+		}
 
-		tableRows = append(tableRows, []string{sizeAsString, "Find with filter", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas})
+		mongoDurationWithReferencing, err := FindMongoWithReferencing(mongoConn)
+		if err != nil {
+			panic(err)
+		}
+
+		tableRows = append(tableRows, []string{sizeAsString, "Find with filter", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas, mongoDurationWithReferencing})
 
 		postgresDuration, err = FindPostgresWithFilterAndProjection(postgresConn)
 		if err != nil {
@@ -170,9 +191,12 @@ func main() {
 			panic(err)
 		}
 
-		mongoDuration, err = FindMongoWithFilterAndProjection(mongoAtlasConn, "projects")
+		mongoDurationAtlas, err = FindMongoWithFilterAndProjection(mongoAtlasConn, "projects")
+		if err != nil {
+			panic(err)
+		}
 
-		tableRows = append(tableRows, []string{sizeAsString, "Find with filter and projection", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas})
+		tableRows = append(tableRows, []string{sizeAsString, "Find with filter and projection", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas, "-"})
 
 		postgresDuration, err = FindPostgresWithFilterAndProjectionAndSort(postgresConn)
 		if err != nil {
@@ -190,9 +214,11 @@ func main() {
 		}
 
 		mongoDurationAtlas, err = FindMongoWithFilterAndProjectionAndSort(mongoAtlasConn, "projects")
+		if err != nil {
+			panic(err)
+		}
 
-		tableRows = append(tableRows, []string{sizeAsString, "Find with filter and projection and sort", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas})
-
+		tableRows = append(tableRows, []string{sizeAsString, "Find with filter and projection and sort", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas, "-"})
 
 		postgresDuration, err = FindPostgresWithAggregation(postgresConn)
 		if err != nil {
@@ -204,7 +230,7 @@ func main() {
 			panic(err)
 		}
 
-		tableRows = append(tableRows, []string{sizeAsString, "Find with aggregation", postgresDuration, mongoDuration, "-", "-"})
+		tableRows = append(tableRows, []string{sizeAsString, "Find with aggregation", postgresDuration, mongoDuration, "-", "-", "-"})
 
 		/* UPDATE */
 
@@ -224,8 +250,16 @@ func main() {
 		}
 
 		mongoDurationAtlas, err = UpdateMongo(mongoAtlasConn, "projects")
+		if err != nil {
+			panic(err)
+		}
 
-		tableRows = append(tableRows, []string{sizeAsString, "Update", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas})
+		mongoDurationReferencing, err = UpdateMongoWithReferencing(mongoConn)
+		if err != nil {
+			panic(err)
+		}
+
+		tableRows = append(tableRows, []string{sizeAsString, "Update", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas, mongoDurationReferencing})
 
 		/* DELETE */
 
@@ -245,13 +279,23 @@ func main() {
 		}
 
 		mongoDurationAtlas, err = DeleteMongo(mongoAtlasConn, "projects")
+		if err != nil {
+			panic(err)
+		}
+
+		mongoDurationReferencing, err = DeleteMongoWithReferencing(mongoConn)
+		if err != nil {
+			panic(err)
+		}
 		
-		tableRows = append(tableRows, []string{sizeAsString, "Delete", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas})
+		tableRows = append(tableRows, []string{sizeAsString, "Delete", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas, mongoDurationReferencing})
 
 		tableRows = append(tableRows, []string{})
 
 		println("Finished test size ", size)
 	}
+
+	fmt.Println(tableRows)	
 
 	PrintTable(tableRows)
 
@@ -579,7 +623,7 @@ func FindPostgresWithFilterAndProjection(conn *pgx.Conn) (duration string, err e
 
 func FindPostgresWithAggregation(conn *pgx.Conn) (duration string, err error) {
 	now := time.Now()
-	_, err = conn.Query(context.Background(), `SELECT users.username AS owner, COUNT(*) AS count FROM projects INNER JOIN users ON projects.owner_id = users.id GROUP BY owner;`)
+	_, err = conn.Exec(context.Background(), `SELECT users.username AS owner, COUNT(*) AS count FROM projects INNER JOIN users ON projects.owner_id = users.id GROUP BY owner;`)
 	if err != nil {
 		return "", err
 	}
@@ -667,6 +711,50 @@ func InsertMongoSchemaViolation(client *mongo.Client) (err error) {
 
 	println("Test Insert successfully violated schema")
 	return nil
+}
+
+func InsertMongoWithReferencing(client *mongo.Client, projects []Project) (duration string, err error) {
+	now := time.Now()
+	ctx := context.Background()
+	for _, project := range projects {
+		result, err := client.Database("test").Collection("users").InsertOne(ctx, bson.M{
+			"username": project.Owner.Username,
+			"first_name": project.Owner.FirstName,
+			"last_name": project.Owner.LastName,
+		})
+		if err != nil {
+			return "", err
+		}
+
+		ownerId := result.InsertedID
+
+
+		result, err = client.Database("test").Collection("projects").InsertOne(ctx, bson.M{
+			"name": project.Name,
+			"identifier": project.Identifier,
+			"invite_code": project.InviteCode,
+			"sprint_duration": project.SprintDuration,
+			"owner": ownerId,
+		})
+		if err != nil {
+			return "", err
+		}
+
+		projectId := result.InsertedID
+
+		for _, sprint := range project.Sprints {
+			_, err = client.Database("test").Collection("sprints").InsertOne(ctx, bson.M{
+				"name": sprint.Name,
+				"project": projectId,
+				"start_date": sprint.StartDate,
+				"end_date": sprint.EndDate,
+			})
+			if err != nil {
+				return "", err
+			}
+		}
+	}
+	return time.Since(now).String(), nil
 }
 
 func FindMongo(client *mongo.Client, collection string) (duration string, err error) {
@@ -782,10 +870,45 @@ func FindMongoWithAggregation(client *mongo.Client, collection string) (duration
 	return time.Since(now).String(), nil
 }
 
+func FindMongoWithReferencing(client *mongo.Client) (duration string, err error) {
+	now := time.Now()
+	ctx := context.Background()
+	cursor, err := client.Database("test").Collection("projects").Find(ctx, bson.M{})
+	if err != nil {
+		return "", err
+	}
+	cursor.Close(ctx)
+
+	cursor, err = client.Database("test").Collection("users").Find(ctx, bson.M{})
+	if err != nil {
+		return "", err
+	}
+	cursor.Close(ctx)
+
+	cursor, err = client.Database("test").Collection("sprints").Find(ctx, bson.M{})
+	if err != nil {
+		return "", err
+	}
+	cursor.Close(ctx)
+
+	return time.Since(now).String(), nil	
+}
+
 func UpdateMongo(client *mongo.Client, collection string) (duration string, err error) {
 	now := time.Now()
 	ctx := context.Background()
 	_, err = client.Database("test").Collection(collection).UpdateMany(ctx, bson.M{}, bson.M{"$inc": bson.M{"sprint_duration": (60*60*24)}})
+	if err != nil {
+		return "", err
+	}
+
+	return time.Since(now).String(), nil
+}
+
+func UpdateMongoWithReferencing(client *mongo.Client) (duration string, err error) {
+	now := time.Now()
+	ctx := context.Background()
+	_, err = client.Database("test").Collection("projects").UpdateMany(ctx, bson.M{}, bson.M{"$inc": bson.M{"sprint_duration": (60*60*24)}})
 	if err != nil {
 		return "", err
 	}
@@ -807,18 +930,48 @@ func DeleteMongo(client *mongo.Client, collection string) (duration string, err 
 	return time.Since(now).String(), nil
 }
 
+func DeleteMongoWithReferencing(client *mongo.Client) (duration string, err error) {
+	now := time.Now()
+	ctx := context.Background()
+	_, err = client.Database("test").Collection("projects").DeleteMany(
+		ctx,
+		bson.M{},
+	)
+	if err != nil {
+		return "", err
+	}
+
+	_, err = client.Database("test").Collection("users").DeleteMany(
+		ctx,
+		bson.M{},
+	)
+	if err != nil {
+		return "", err
+	}
+
+	_, err = client.Database("test").Collection("sprints").DeleteMany(
+		ctx,
+		bson.M{},
+	)
+	if err != nil {
+		return "", err
+	}
+
+	return time.Since(now).String(), nil
+}
+
 /* TABLE */
 
 func PrintTable(rows [][]string) {
 	t := table.NewWriter()
 	t.SetOutputMirror(os.Stdout)
-	t.AppendHeader(table.Row{"#", "Query", "Postgres", "Mongo", "Mongo (Index)", "Mongo (Atlas)"})
+	t.AppendHeader(table.Row{"#", "Query", "Postgres", "Mongo", "Mongo (Index)", "Mongo (Atlas)", "Mongo (Referencing)"})
 	for _, row := range rows {
-		if len(row) != 6 {
+		if len(row) != 7 {
 			t.AppendSeparator()
 			continue
 		}
-		t.AppendRow(table.Row{row[0], row[1], row[2], row[3], row[4], row[5]})
+		t.AppendRow(table.Row{row[0], row[1], row[2], row[3], row[4], row[5], row[6]})
 	}
 	t.Render()
 }

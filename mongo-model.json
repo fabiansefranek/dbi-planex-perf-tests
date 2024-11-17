@@ -1,5 +1,5 @@
 {
-  "id": "int",
+  "_id": "string",
   "name": "string",
   "identifier": "string",
   "invite_code": "string",
