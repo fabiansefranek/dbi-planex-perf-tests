@@ -24,6 +24,7 @@ const (
 )
 
 func main() {
+	/* --- START CONTAINERS --- */
 	println("Starting Postgres container...")
 	postgresConnectionString, postgresContainer, err := StartPostgres()
 	if err != nil {
@@ -54,7 +55,7 @@ func main() {
 			panic(err)
 			
 		}
-	}()
+	}()	
 
 	mongoConn, err := ConnectMongoDB(mongoConnectionString, false)
 	if err != nil {
@@ -70,10 +71,17 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	
-	InsertMongoSchemaViolation(mongoConn)
 
 	mongoAtlasConn, err := ConnectMongoDB(atlasConnectionString, true)
+
+	/* --- SCHEMA VALIDATION TEST --- */
+
+	err = InsertMongoSchemaViolation(mongoConn)
+	if err != nil {
+		panic(err)
+	}
+
+	/* --- PERFORMANCE TESTS --- */
 
 	sizes := []int{100, 1000, 10000}
 	tableRows := make([][]string, 0)
@@ -81,11 +89,10 @@ func main() {
 	println("Starting performance tests...")
 	for _, size := range sizes {
 		sizeAsString := fmt.Sprint(size)
-
 		projects := GenerateProjects(size)
-		/* PERFORMANCE TESTS */
 
-		/* insert */
+		/* INSERT */
+
 		postgresDuration, err := InsertPostgres(postgresConn, projects)
 		if err != nil {
 			panic(err)
@@ -108,7 +115,7 @@ func main() {
 
 		tableRows = append(tableRows, []string{sizeAsString, "Insert", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas})
 
-		/* find */
+		/* FIND */
 
 		postgresDuration, err = FindPostgres(postgresConn)
 		if err != nil {
@@ -186,7 +193,20 @@ func main() {
 
 		tableRows = append(tableRows, []string{sizeAsString, "Find with filter and projection and sort", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas})
 
-		/* update */
+
+		postgresDuration, err = FindPostgresWithAggregation(postgresConn)
+		if err != nil {
+			panic(err)
+		}
+
+		mongoDuration, err = FindMongoWithAggregation(mongoConn, "projects")
+		if err != nil {
+			panic(err)
+		}
+
+		tableRows = append(tableRows, []string{sizeAsString, "Find with aggregation", postgresDuration, mongoDuration, "-", "-"})
+
+		/* UPDATE */
 
 		postgresDuration, err = UpdatePostgres(postgresConn)
 		if err != nil {
@@ -207,7 +227,7 @@ func main() {
 
 		tableRows = append(tableRows, []string{sizeAsString, "Update", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas})
 
-		/* delete */
+		/* DELETE */
 
 		postgresDuration, err = DeletePostgres(postgresConn)
 		if err != nil {
@@ -232,14 +252,10 @@ func main() {
 
 		println("Finished test size ", size)
 	}
-	/* TABLE */
 
 	PrintTable(tableRows)
 
 	println("Performance tests finished")
-
-	// SCHEMA VALIDATION TEST
-
 
 	time.Sleep(1 * time.Hour) 
 }
@@ -471,24 +487,6 @@ func RandomTimestamp() int64 {
 	return rand.Int63n(time.Now().Unix() - 94608000) + 94608000
 }
 
-/* func GenerateStrings(arraySize int, stringLength int) []string {
-	var result []string
-	for i := 0; i < arraySize; i++ {
-		result = append(result, RandomString(stringLength))
-	}
-
-	return result
-}
-
-func GenerateTimestamps(arraySize int) []string {
-	var result []string
-	for i := 0; i < arraySize; i++ {
-		result = append(result, RandomTimestamp())
-	}
-
-	return result
-} */
-
 func GenerateProjects(arraySize int) []Project {
 	var result []Project
 	for i := 0; i < arraySize; i++ {
@@ -572,6 +570,16 @@ func FindPostgresWithFilter(conn *pgx.Conn) (duration string, err error) {
 func FindPostgresWithFilterAndProjection(conn *pgx.Conn) (duration string, err error) {
 	now := time.Now()
 	_, err = conn.Exec(context.Background(), `SELECT users.username, projects.name, sprints.name FROM sprints INNER JOIN projects ON sprints.project_id = projects.id INNER JOIN users ON projects.owner_id = users.id WHERE projects.sprint_duration > 50;`)
+	if err != nil {
+		return "", err
+	}
+
+	return time.Since(now).String(), nil
+}
+
+func FindPostgresWithAggregation(conn *pgx.Conn) (duration string, err error) {
+	now := time.Now()
+	_, err = conn.Query(context.Background(), `SELECT users.username AS owner, COUNT(*) AS count FROM projects INNER JOIN users ON projects.owner_id = users.id GROUP BY owner;`)
 	if err != nil {
 		return "", err
 	}
@@ -748,6 +756,29 @@ func FindMongoWithFilterAndProjectionAndSort(client *mongo.Client, collection st
 	}
 	cursor.Close(ctx)
 
+	return time.Since(now).String(), nil
+}
+
+func FindMongoWithAggregation(client *mongo.Client, collection string) (duration string, err error) {
+	// Count projects per owner 
+	now := time.Now()
+	ctx := context.Background()
+	cursor, err := client.Database("test").Collection(collection).Aggregate(ctx, []bson.M{
+		{
+			"$unwind": "$owner",
+		},
+		{
+			"$group": bson.M{
+				"_id": "$owner.username",
+				"count": bson.M{"$sum": 1},
+			},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+
+	cursor.Close(ctx)
 	return time.Since(now).String(), nil
 }
 
