@@ -4,11 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
 	"os"
 	"time"
 
+	"github.com/go-echarts/go-echarts/v2/charts"
+	"github.com/go-echarts/go-echarts/v2/components"
+	"github.com/go-echarts/go-echarts/v2/opts"
 	"github.com/jackc/pgx/v5"
 	"github.com/jedib0t/go-pretty/v6/table"
 	"github.com/testcontainers/testcontainers-go"
@@ -73,6 +77,9 @@ func main() {
 	}
 
 	mongoAtlasConn, err := ConnectMongoDB(atlasConnectionString, true)
+	if err != nil {
+		panic(err)
+	}
 
 	/* --- SCHEMA VALIDATION TEST --- */
 
@@ -83,8 +90,13 @@ func main() {
 
 	/* --- PERFORMANCE TESTS --- */
 
-	sizes := []int{100, 1000/*, 10000*/}
+	sizes := []int{100, 1000/*, 10000*/} // TODO: Recompile charts!
 	tableRows := make([][]string, 0)
+
+	postgresInsertData, mongoInsertData := make([]opts.LineData, 0), make([]opts.LineData, 0)
+	postgresFindData, mongoFindData := make([]opts.LineData, 0), make([]opts.LineData, 0)
+	postgresUpdateData, mongoUpdateData := make([]opts.LineData, 0), make([]opts.LineData, 0)
+	postgresDeleteData, mongoDeleteData := make([]opts.LineData, 0), make([]opts.LineData, 0)
 
 	println("Starting performance tests...")
 	for _, size := range sizes {
@@ -93,78 +105,81 @@ func main() {
 
 		/* INSERT */
 
-		postgresDuration, err := InsertPostgres(postgresConn, projects)
+		postgresDurationNumeric, err := InsertPostgres(postgresConn, projects)
 		if err != nil {
 			panic(err)
 		}
 
-		mongoDuration, err := InsertMongo(mongoConn, projects, "projects")
+		mongoDurationNumeric, err := InsertMongo(mongoConn, projects, "projects")
 		if err != nil {
 			panic(err)
 		}
 
-		mongoDurationWithIndex, err := InsertMongo(mongoConn, projects, "projects_index")
+		mongoDurationWithIndexNumeric, err := InsertMongo(mongoConn, projects, "projects_index")
 		if err != nil {
 			panic(err)
 		}
 
-		mongoDurationAtlas, err := InsertMongo(mongoAtlasConn, projects, "projects")
+		mongoDurationAtlasNumeric, err := InsertMongo(mongoAtlasConn, projects, "projects")
 		if err != nil {
 			panic(err)
 		}
 
-		mongoDurationReferencing, err := InsertMongoWithReferencing(mongoConn, projects)
+		mongoDurationRefercing, err := InsertMongoWithReferencing(mongoConn, projects)
 		if err != nil {
 			panic(err)
 		}
 
-		tableRows = append(tableRows, []string{sizeAsString, "Insert", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas, mongoDurationReferencing})
+		tableRows = append(tableRows, []string{sizeAsString, "Insert", postgresDurationNumeric.String(), mongoDurationNumeric.String(), mongoDurationWithIndexNumeric.String(), mongoDurationAtlasNumeric.String(), mongoDurationRefercing})
+
+		postgresInsertData = append(postgresInsertData, opts.LineData{Value: postgresDurationNumeric.Milliseconds()})
+		mongoInsertData = append(mongoInsertData, opts.LineData{Value: mongoDurationNumeric.Milliseconds()})
 
 		/* FIND */
 
-		postgresDuration, err = FindPostgres(postgresConn)
+		postgresDuration, err := FindPostgres(postgresConn)
 		if err != nil {
 			panic(err)
 		}
 
-		mongoDuration, err = FindMongo(mongoConn, "projects")
+		mongoDuration, err := FindMongo(mongoConn, "projects")
 		if err != nil {
 			panic(err)
 		}
 
-		mongoDurationWithIndex, err = FindMongo(mongoConn, "projects_index")
+		mongoDurationWithIndex, err := FindMongo(mongoConn, "projects_index")
 		if err != nil {
 			panic(err)
 		}
 
-		mongoDurationAtlas, err = FindMongo(mongoAtlasConn, "projects")
+		mongoDurationAtlas, err := FindMongo(mongoAtlasConn, "projects")
 		if err != nil {
 			panic(err)
 		}
 
-		mongoDurationReferencing, err = FindMongoWithReferencing(mongoConn)
+		mongoDurationReferencing, err := FindMongoWithReferencing(mongoConn)
 		if err != nil {
 			panic(err)
 		}
 
 		tableRows = append(tableRows, []string{sizeAsString, "Find", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas, mongoDurationReferencing})
 
-		postgresDuration, err = FindPostgresWithFilter(postgresConn)
+		postgresDurationNumeric, err = FindPostgresWithFilter(postgresConn)
 		if err != nil {
 			panic(err)
 		}
 
-		mongoDuration, err = FindMongoWithFilter(mongoConn, "projects")
+		mongoDurationNumeric, err = FindMongoWithFilter(mongoConn, "projects")
 		if err != nil {
 			panic(err)
 		}
 
-		mongoDurationWithIndex, err = FindMongoWithFilter(mongoConn, "projects_index")
+		mongoDurationWithIndexNumeric, err = FindMongoWithFilter(mongoConn, "projects_index")
 		if err != nil {
 			panic(err)
 		}
 
-		mongoDurationAtlas, err = FindMongoWithFilter(mongoAtlasConn, "projects")
+		mongoDurationAtlasNumeric, err = FindMongoWithFilter(mongoAtlasConn, "projects")
 		if err != nil {
 			panic(err)
 		}
@@ -174,7 +189,10 @@ func main() {
 			panic(err)
 		}
 
-		tableRows = append(tableRows, []string{sizeAsString, "Find with filter", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas, mongoDurationWithReferencing})
+		tableRows = append(tableRows, []string{sizeAsString, "Find with filter", postgresDurationNumeric.String(), mongoDurationNumeric.String(), mongoDurationWithIndexNumeric.String(), mongoDurationAtlasNumeric.String(), mongoDurationWithReferencing})
+
+		postgresFindData = append(postgresFindData, opts.LineData{Value: postgresDurationNumeric.Milliseconds()})
+		mongoFindData = append(mongoFindData, opts.LineData{Value: mongoDurationNumeric.Milliseconds()})
 
 		postgresDuration, err = FindPostgresWithFilterAndProjection(postgresConn)
 		if err != nil {
@@ -234,22 +252,22 @@ func main() {
 
 		/* UPDATE */
 
-		postgresDuration, err = UpdatePostgres(postgresConn)
+		postgresDurationNumeric, err = UpdatePostgres(postgresConn)
 		if err != nil {
 			panic(err)
 		}
 
-		mongoDuration, err = UpdateMongo(mongoConn, "projects")
+		mongoDurationNumeric, err = UpdateMongo(mongoConn, "projects")
 		if err != nil {
 			panic(err)
 		}
 
-		mongoDurationWithIndex, err = UpdateMongo(mongoConn, "projects_index")
+		mongoDurationWithIndexNumeric, err = UpdateMongo(mongoConn, "projects_index")
 		if err != nil {
 			panic(err)
 		}
 
-		mongoDurationAtlas, err = UpdateMongo(mongoAtlasConn, "projects")
+		mongoDurationAtlasNumeric, err = UpdateMongo(mongoAtlasConn, "projects")
 		if err != nil {
 			panic(err)
 		}
@@ -259,26 +277,29 @@ func main() {
 			panic(err)
 		}
 
-		tableRows = append(tableRows, []string{sizeAsString, "Update", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas, mongoDurationReferencing})
+		tableRows = append(tableRows, []string{sizeAsString, "Update", postgresDurationNumeric.String(), mongoDurationNumeric.String(), mongoDurationWithIndexNumeric.String(), mongoDurationAtlasNumeric.String(), mongoDurationReferencing})
+
+		postgresUpdateData = append(postgresUpdateData, opts.LineData{Value: postgresDurationNumeric.Milliseconds()})
+		mongoUpdateData = append(mongoUpdateData, opts.LineData{Value: mongoDurationNumeric.Milliseconds()})
 
 		/* DELETE */
 
-		postgresDuration, err = DeletePostgres(postgresConn)
+		postgresDurationNumeric, err = DeletePostgres(postgresConn)
 		if err != nil {
 			panic(err)
 		}
 
-		mongoDuration, err = DeleteMongo(mongoConn, "projects")
+		mongoDurationNumeric, err = DeleteMongo(mongoConn, "projects")
 		if err != nil {
 			panic(err)
 		}
 
-		mongoDurationWithIndex, err = DeleteMongo(mongoConn, "projects_index")
+		mongoDurationWithIndexNumeric, err = DeleteMongo(mongoConn, "projects_index")
 		if err != nil {
 			panic(err)
 		}
 
-		mongoDurationAtlas, err = DeleteMongo(mongoAtlasConn, "projects")
+		mongoDurationAtlasNumeric, err = DeleteMongo(mongoAtlasConn, "projects")
 		if err != nil {
 			panic(err)
 		}
@@ -288,16 +309,31 @@ func main() {
 			panic(err)
 		}
 		
-		tableRows = append(tableRows, []string{sizeAsString, "Delete", postgresDuration, mongoDuration, mongoDurationWithIndex, mongoDurationAtlas, mongoDurationReferencing})
+		tableRows = append(tableRows, []string{sizeAsString, "Delete", postgresDurationNumeric.String(), mongoDurationNumeric.String(), mongoDurationWithIndexNumeric.String(), mongoDurationAtlasNumeric.String(), mongoDurationReferencing})
+
+		postgresDeleteData = append(postgresDeleteData, opts.LineData{Value: postgresDurationNumeric.Milliseconds()})
+		mongoDeleteData = append(mongoDeleteData, opts.LineData{Value: mongoDurationNumeric.Milliseconds()})
 
 		tableRows = append(tableRows, []string{})
 
 		println("Finished test size ", size)
 	}
 
-	fmt.Println(tableRows)	
-
 	PrintTable(tableRows)
+
+	/* --- CHARTS --- */
+	insertLineChart := CreateLineChart("Insert", sizes, postgresInsertData, mongoInsertData)
+	findLineChart := CreateLineChart("Find (With Filter)", sizes, postgresFindData, mongoFindData)
+	updateLineChart := CreateLineChart("Update", sizes, postgresUpdateData, mongoUpdateData)
+	deleteLineChart := CreateLineChart("Delete", sizes, postgresDeleteData, mongoDeleteData)
+
+	page := components.NewPage()
+	page.AddCharts(insertLineChart, findLineChart, updateLineChart, deleteLineChart)
+	f, err := os.Create("charts.html")
+	if err != nil {
+		panic(err)
+	}
+	page.Render(io.MultiWriter(f))
 
 	println("Performance tests finished")
 
@@ -558,7 +594,7 @@ func GenerateProjects(arraySize int) []Project {
 
 /* PERFORMANCE TESTS */
 
-func InsertPostgres(conn *pgx.Conn, projects []Project) (duration string, err error) {
+func InsertPostgres(conn *pgx.Conn, projects []Project) (duration time.Duration, err error) {
 	now := time.Now()
 	for _, project := range projects {
 		var userId int
@@ -566,7 +602,7 @@ func InsertPostgres(conn *pgx.Conn, projects []Project) (duration string, err er
 			`INSERT INTO users (username, first_name, last_name) VALUES ($1, $2, $3) RETURNING id;`,
 			project.Owner.Username, project.Owner.FirstName, project.Owner.LastName).Scan(&userId)
 		if err != nil {
-			return "", err
+			return time.Since(now), err
 		}
 
 		var projectId int
@@ -574,7 +610,7 @@ func InsertPostgres(conn *pgx.Conn, projects []Project) (duration string, err er
 			`INSERT INTO projects (name, identifier, invite_code, sprint_duration, owner_id) VALUES ($1, $2, $3, $4, $5) RETURNING id;`,
 			project.Name, project.Identifier, project.InviteCode, project.SprintDuration, userId).Scan(&projectId)
 		if err != nil {
-			return "", err
+			return time.Since(now), err
 		}
 
 		for _, sprint := range project.Sprints {
@@ -583,12 +619,12 @@ func InsertPostgres(conn *pgx.Conn, projects []Project) (duration string, err er
 				`INSERT INTO sprints (name, project_id, start_date, end_date) VALUES ($1, $2, $3, $4) RETURNING id;`,
 				sprint.Name, projectId, sprint.StartDate, sprint.EndDate).Scan(&sprintId)
 			if err != nil {
-				return "", err
+				return time.Since(now), err
 			}
 		}
 	}
 
-	return time.Since(now).String(), nil
+	return time.Since(now), nil
 }
 
 func FindPostgres(conn *pgx.Conn) (duration string, err error) {
@@ -601,14 +637,14 @@ func FindPostgres(conn *pgx.Conn) (duration string, err error) {
 	return time.Since(now).String(), nil
 }
 
-func FindPostgresWithFilter(conn *pgx.Conn) (duration string, err error) {
+func FindPostgresWithFilter(conn *pgx.Conn) (duration time.Duration, err error) {
 	now := time.Now()	
 	_, err = conn.Exec(context.Background(), `SELECT * FROM sprints INNER JOIN projects ON sprints.project_id = projects.id INNER JOIN users ON projects.owner_id = users.id WHERE projects.sprint_duration > 50;`)
 	if err != nil {
-		return "", err
+		return time.Since(now), err
 	}
 
-	return time.Since(now).String(), nil
+	return time.Since(now), nil
 }
 
 func FindPostgresWithFilterAndProjection(conn *pgx.Conn) (duration string, err error) {
@@ -641,25 +677,25 @@ func FindPostgresWithFilterAndProjectionAndSort(conn *pgx.Conn) (duration string
 	return time.Since(now).String(), nil
 }
 
-func UpdatePostgres(conn *pgx.Conn) (duration string, err error) {
+func UpdatePostgres(conn *pgx.Conn) (duration time.Duration, err error) {
 	now := time.Now()
 	_, err = conn.Exec(context.Background(), `UPDATE sprints SET start_date = start_date + (60*60*24)`)
 	if err != nil {
-		return "", err
+		return time.Since(now), err
 	}
-	return time.Since(now).String(), nil
+	return time.Since(now), nil
 }
 
-func DeletePostgres(conn *pgx.Conn) (duration string, err error) {
+func DeletePostgres(conn *pgx.Conn) (duration time.Duration, err error) {
 	now := time.Now()
 	_, err = conn.Exec(context.Background(), `DELETE FROM sprints`)
 	if err != nil {
-		return "", err
+		return time.Since(now), err
 	}
-	return time.Since(now).String(), nil
+	return time.Since(now), nil
 }
 
-func InsertMongo(client *mongo.Client, projects []Project, collection string) (duration string, err error) {
+func InsertMongo(client *mongo.Client, projects []Project, collection string) (duration time.Duration, err error) {
 	now := time.Now()
 	ctx := context.Background()
 	for _, project := range projects {
@@ -682,10 +718,10 @@ func InsertMongo(client *mongo.Client, projects []Project, collection string) (d
 			},
 		})
 		if err != nil {
-			return "", err
+			return time.Since(now), err
 		}
 	}
-	return time.Since(now).String(), nil
+	return time.Since(now), nil
 }
 
 func InsertMongoSchemaViolation(client *mongo.Client) (err error) {
@@ -706,7 +742,7 @@ func InsertMongoSchemaViolation(client *mongo.Client) (err error) {
 		},
 	})
 	if err == nil {
-		return errors.New("Insert is not violating schema, but should")
+		return errors.New("insert is not violating schema, but should")
 	}
 
 	println("Test Insert successfully violated schema")
@@ -769,16 +805,16 @@ func FindMongo(client *mongo.Client, collection string) (duration string, err er
 	return time.Since(now).String(), nil
 }
 
-func FindMongoWithFilter(client *mongo.Client, collection string) (duration string, err error) {
+func FindMongoWithFilter(client *mongo.Client, collection string) (duration time.Duration, err error) {
 	now := time.Now()
 	ctx := context.Background()
 	cursor, err := client.Database("test").Collection(collection).Find(ctx, bson.M{"sprint_duration": bson.M{"$gt": 50}})
 	if err != nil {
-		return "", err
+		return time.Since(now), err
 	}
 	cursor.Close(ctx)
 
-	return time.Since(now).String(), nil
+	return time.Since(now), nil
 }
 
 func FindMongoWithFilterAndProjection(client *mongo.Client, collection string) (duration string, err error) {
@@ -894,15 +930,15 @@ func FindMongoWithReferencing(client *mongo.Client) (duration string, err error)
 	return time.Since(now).String(), nil	
 }
 
-func UpdateMongo(client *mongo.Client, collection string) (duration string, err error) {
+func UpdateMongo(client *mongo.Client, collection string) (duration time.Duration, err error) {
 	now := time.Now()
 	ctx := context.Background()
 	_, err = client.Database("test").Collection(collection).UpdateMany(ctx, bson.M{}, bson.M{"$inc": bson.M{"sprint_duration": (60*60*24)}})
 	if err != nil {
-		return "", err
+		return time.Since(now), err
 	}
 
-	return time.Since(now).String(), nil
+	return time.Since(now), nil
 }
 
 func UpdateMongoWithReferencing(client *mongo.Client) (duration string, err error) {
@@ -916,7 +952,7 @@ func UpdateMongoWithReferencing(client *mongo.Client) (duration string, err erro
 	return time.Since(now).String(), nil
 }
 
-func DeleteMongo(client *mongo.Client, collection string) (duration string, err error) {
+func DeleteMongo(client *mongo.Client, collection string) (duration time.Duration, err error) {
 	now := time.Now()
 	ctx := context.Background()
 	_, err = client.Database("test").Collection(collection).DeleteMany(
@@ -924,10 +960,10 @@ func DeleteMongo(client *mongo.Client, collection string) (duration string, err 
 		bson.M{},
 	)
 	if err != nil {
-		return "", err
+		return time.Since(now), err
 	}
 
-	return time.Since(now).String(), nil
+	return time.Since(now), nil
 }
 
 func DeleteMongoWithReferencing(client *mongo.Client) (duration string, err error) {
@@ -974,4 +1010,20 @@ func PrintTable(rows [][]string) {
 		t.AppendRow(table.Row{row[0], row[1], row[2], row[3], row[4], row[5], row[6]})
 	}
 	t.Render()
+}
+
+/* CHARTS */
+
+func CreateLineChart(title string, sizes []int, postgresData []opts.LineData, mongoData []opts.LineData) *charts.Line {
+	lineChart := charts.NewLine()
+
+	lineChart.SetGlobalOptions(
+		charts.WithTitleOpts(opts.Title{Title: title}),
+		charts.WithXAxisOpts(opts.XAxis{Name: "Batch Size"}),
+		charts.WithYAxisOpts(opts.YAxis{Name: "Time (ms)"}),
+	)
+
+	lineChart.SetXAxis(sizes).AddSeries("Postgres", postgresData).AddSeries("Mongo", mongoData)
+
+	return lineChart
 }
