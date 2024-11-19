@@ -21,6 +21,9 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+
+	"github.com/fabiansefranek/dbi-perf-tests/db"
+	"github.com/fabiansefranek/dbi-perf-tests/models"
 )
 
 const (
@@ -41,6 +44,8 @@ func main() {
 		panic(err)
 	}
 	defer postgresConn.Close(context.Background())
+
+	db.PostgresConn = postgresConn
 
 	println("Initializing Postgres...")
 	err = InitializePostgres(postgresConn)
@@ -71,10 +76,16 @@ func main() {
 		}
 	}()
 
+	db.MongoConn = mongoConn
+
 	err = InitializeMongoDB(mongoConn)
 	if err != nil {
 		panic(err)
 	}
+
+	StartServer()
+
+	return
 
 	mongoAtlasConn, err := ConnectMongoDB(atlasConnectionString, true)
 	if err != nil {
@@ -340,33 +351,6 @@ func main() {
 	time.Sleep(1 * time.Hour) 
 }
 
-/* TYPES */
-
-type Project struct {
-	Id int
-	Name string
-	Identifier string
-	InviteCode string
-	SprintDuration int
-	Owner User
-	Sprints []Sprint
-}
-
-type User struct {
-	Id int
-	Username string
-	FirstName string
-	LastName string
-}
-
-type Sprint struct {
-	Id int
-	Name string
-	StartDate int64
-	EndDate int64
-}
-
-
 /* POSTGRES */
 
 func StartPostgres() (connectionString string, container *postgres.PostgresContainer, err error) {
@@ -567,20 +551,20 @@ func RandomTimestamp() int64 {
 	return rand.Int63n(time.Now().Unix() - 94608000) + 94608000
 }
 
-func GenerateProjects(arraySize int) []Project {
-	var result []Project
+func GenerateProjects(arraySize int) []models.Project {
+	var result []models.Project
 	for i := 0; i < arraySize; i++ {
-		result = append(result, Project{
+		result = append(result, models.Project{
 			Name: RandomString(10),
 			Identifier: RandomString(48),
 			InviteCode: RandomString(128),
 			SprintDuration: rand.Intn(100) + 1,
-			Owner: User{
+			Owner: models.User{
 				Username: RandomString(10),
 				FirstName: RandomString(10),
 				LastName: RandomString(10),
 			},
-			Sprints: []Sprint{
+			Sprints: []models.Sprint{
 				{
 					Name: RandomString(10),
 					StartDate: RandomTimestamp(),
@@ -594,7 +578,7 @@ func GenerateProjects(arraySize int) []Project {
 
 /* PERFORMANCE TESTS */
 
-func InsertPostgres(conn *pgx.Conn, projects []Project) (duration time.Duration, err error) {
+func InsertPostgres(conn *pgx.Conn, projects []models.Project) (duration time.Duration, err error) {
 	now := time.Now()
 	for _, project := range projects {
 		var userId int
@@ -695,7 +679,7 @@ func DeletePostgres(conn *pgx.Conn) (duration time.Duration, err error) {
 	return time.Since(now), nil
 }
 
-func InsertMongo(client *mongo.Client, projects []Project, collection string) (duration time.Duration, err error) {
+func InsertMongo(client *mongo.Client, projects []models.Project, collection string) (duration time.Duration, err error) {
 	now := time.Now()
 	ctx := context.Background()
 	for _, project := range projects {
@@ -749,7 +733,7 @@ func InsertMongoSchemaViolation(client *mongo.Client) (err error) {
 	return nil
 }
 
-func InsertMongoWithReferencing(client *mongo.Client, projects []Project) (duration string, err error) {
+func InsertMongoWithReferencing(client *mongo.Client, projects []models.Project) (duration string, err error) {
 	now := time.Now()
 	ctx := context.Background()
 	for _, project := range projects {

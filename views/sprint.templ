@@ -1,0 +1,68 @@
+package views
+
+import "strconv"
+import "github.com/fabiansefranek/dbi-perf-tests/handlers"
+import "fmt"
+
+templ Sprint(db string, id int) {
+    {{ updateUrl := fmt.Sprintf("/%s/sprints/update", db) }}
+    {{ deleteUrl := fmt.Sprintf("/%s/sprints/delete", db) }}
+    {{ sprint := handlers.GetSprint(id) }}
+    {{ id := strconv.Itoa(sprint.Id) }}
+
+    @Layout() {
+        <form action={ templ.SafeURL(updateUrl) } method="POST">
+            <input type="hidden" name="id" value={ id }>
+			<input class="input" type="text" name="name" placeholder="Name" value={ sprint.Name }>
+			<input class="input" type="text" name="start_date" placeholder="Start Date" value={ strconv.FormatInt(sprint.StartDate, 10) }>
+			<input class="input" type="text" name="end_date" placeholder="End Date" value={ strconv.FormatInt(sprint.EndDate, 10)  }>
+			<button class="button" type="submit">Update Sprint</button>
+		</form>
+        <table class="table m-auto is-fullwidth">
+            <thead>
+                <tr>
+                    <th>
+                        <p>Id</p>
+                    </th> 
+                    <th>
+                        <p>Name</p>
+                    </th> 
+                    <th>
+                        <p>Start Date</p>
+                    </th> 
+                    <th>
+                        <p>End Date</p>
+                    </th> 
+                    <th>
+                        <p>Project Id</p>
+                    </th> 
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>
+                        <p>{ id }</p>
+                    </td>
+                    <td>
+                        <p>{ sprint.Name }</p>
+                    </td>
+                    <td>
+                        <p>{ strconv.FormatInt(sprint.StartDate, 10)  }</p>
+                    </td>
+                    <td>
+                        <p>{ strconv.FormatInt(sprint.EndDate, 10)  }</p>
+                    </td>
+                    <td>
+                        <p>{ strconv.Itoa(sprint.ProjectId)  }</p>
+                    </td>
+                    <td>
+                        <form action={ templ.SafeURL(deleteUrl) } method="POST">
+                            <input type="hidden" name="id" value={ strconv.Itoa(sprint.Id) }>
+                            <button class="button is-danger is-small">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            </tbody>
+        </table> 
+    }
+}

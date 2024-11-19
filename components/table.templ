@@ -1,0 +1,47 @@
+package components
+
+import "fmt"
+
+templ Table(db string, entity string, header []string, data [][]string) {
+    {{ deleteEntityRoute := fmt.Sprintf("/%s/%s/delete", db, entity) }}
+
+    <div class="m-auto is-fullwidth">
+       <table class="table m-auto is-fullwidth">
+            <thead>
+                <tr>
+                    for _, item := range header {
+                        <th>{ item }</th>
+                    }
+                    <th>
+                        <p>Delete</p>
+                    </th>
+                    <th>
+                        <p>View</p>
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                for _, row := range data {
+                    <tr>
+                        for _, item := range row {
+                            <td>{ item }</td>
+                        }
+                        <td>
+                            <form action={ templ.SafeURL(deleteEntityRoute) } method="POST">
+                                <input type="hidden" name="id" value={ row[0] }>
+                                <button class="button is-danger is-small">Delete</button>
+                            </form>
+                        </td>
+                        <td>
+                            <button class="button is-info is-small" onclick={ViewEntity(entity, row[0], db)}>View</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table> 
+    </div>
+}
+
+script ViewEntity(entity string, id string, db string) {
+    window.location.href=`/${db}/${entity}/${id}`
+}

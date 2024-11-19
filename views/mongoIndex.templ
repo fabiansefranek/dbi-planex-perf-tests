@@ -1,0 +1,58 @@
+package views
+
+import (
+    "github.com/fabiansefranek/dbi-perf-tests/components" 
+	"github.com/fabiansefranek/dbi-perf-tests/handlers"
+)
+
+templ MongoIndex() {
+    {{ users := handlers.GetMongoUsers() }}
+    {{ sprints := handlers.GetMongoSprints() }}
+    {{ projects := handlers.GetMongoProjects() }}
+
+    @Layout() { 
+         <p class="title is-4">Users</p>
+		<form action="/mongo/users" method="POST">
+            <div style="display: flex; flex-direction:row; justify-content: space-between;">
+                <input class="input" type="text" name="username" placeholder="Username" required>
+                <input class="input" type="text" name="firstName" placeholder="First Name" required>
+                <input class="input" type="text" name="lastName" placeholder="Last Name" required>
+            </div>
+			<button class="button" type="submit">Add User</button>
+		</form>
+        @components.Table("mongo", "users", []string{"Id", "Name", "First Name", "Last Name"}, users)
+
+        <br>
+        <hr>
+        <br>
+
+        <p class="title is-4">Projects</p>
+        <form action="/mongo/projects" method="POST">
+            <div style="display: flex; flex-direction:row; justify-content: space-between;">
+                <input class="input" type="text" name="name" placeholder="Project Name" required>
+                <input class="input" type="text" name="identifier" placeholder="Identifier" required>
+                <input class="input" type="text" name="invite_code" placeholder="Invite Code" required>
+                <input class="input" type="number" name="sprint_duration" placeholder="Sprint Duration" required>
+                <input class="input" type="text" name="owner_id" placeholder="Owner Id" required>
+            </div>
+			<button class="button" type="submit">Add Project</button>
+		</form>
+        @components.Table("mongo", "projects", []string{"Id", "Name", "Identifier", "Invite Code", "Sprint Duration", "Owner Id"}, projects)
+
+        <br>
+        <hr>
+        <br>
+
+        <p class="title is-4">Sprints</p>
+        <form action="/mongo/sprints" method="POST">
+            <div style="display: flex; flex-direction:row; justify-content: space-between;">
+                <input class="input" type="text" name="name" placeholder="Sprint Name" required>
+                <input class="input" type="text" name="start_date" placeholder="Start Date" required>
+                <input class="input" type="text" name="end_date" placeholder="End Date" required>
+                <input class="input" type="text" name="project_id" placeholder="Project Id" required>
+            </div>
+			<button class="button" type="submit">Add Sprint</button>
+		</form>
+        @components.Table("mongo", "sprints", []string{"Id", "Sprint Name", "Start Date", "End Date", "Project Id"}, sprints)        
+    }
+}

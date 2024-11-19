@@ -1,0 +1,76 @@
+package views
+
+import "strconv"
+import "github.com/fabiansefranek/dbi-perf-tests/handlers"
+import "fmt"
+
+templ Project(db string, id int) {
+    {{ updateUrl := fmt.Sprintf("/%s/projects/update", db) }}
+    {{ deleteUrl := fmt.Sprintf("/%s/projects/delete", db) }}
+    {{ project := handlers.GetProject(id) }}
+    {{ id := strconv.Itoa(project.Id) }}
+
+    @Layout() {
+        <form action={ templ.SafeURL(updateUrl) } method="POST">
+            <input type="hidden" name="id" value={ id }>
+            <input class="input" type="text" name="name" placeholder="Name" value={ project.Name }>
+            <input class="input" type="text" name="identifier" placeholder="Identifier" value={ project.Identifier }>
+            <input class="input" type="text" name="invite_code" placeholder="Invite Code" value={ project.InviteCode }>
+            <input class="input" type="text" name="sprint_duration" placeholder="Sprint Duration" value={ strconv.Itoa(project.SprintDuration) }>
+            <input class="input" type="text" name="owner_id" placeholder="Owner Id" value={ strconv.Itoa(project.OwnerId) }>
+			<button class="button" type="submit">Update Project</button>
+		</form>
+        <table class="table m-auto is-fullwidth">
+            <thead>
+                <tr>
+                    <th>
+                        <p>Id</p>
+                    </th> 
+                    <th>
+                        <p>Name</p>
+                    </th>
+                    <th>
+                        <p>Identifier</p>
+                    </th>
+                    <th>
+                        <p>Invite Code</p>
+                    </th>
+                    <th>
+                        Sprint Duration
+                    </th>
+                    <th>
+                        Project Owner
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>
+                        <p>{ id }</p>
+                    </td>
+                    <td>
+                        <p>{ project.Name }</p>
+                    </td>
+                    <td>
+                        <p>{ project.Identifier }</p>
+                    </td>
+                    <td>
+                        <p>{ project.InviteCode }</p>
+                    </td>
+                    <td>
+                        { strconv.Itoa(project.SprintDuration) }
+                    </td>
+                    <td>
+                        { strconv.Itoa(project.OwnerId) }
+                    </td>
+                    <td>
+                        <form action={ templ.SafeURL(deleteUrl) } method="POST">
+                            <input type="hidden" name="id" value={ strconv.Itoa(project.Id) }>
+                            <button class="button is-danger is-small">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            </tbody>
+        </table> 
+    }
+}

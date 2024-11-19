@@ -1,0 +1,63 @@
+package views
+
+import "github.com/fabiansefranek/dbi-perf-tests/handlers"
+import "fmt"
+
+templ MongoUser(db string, id string) {
+    {{ updateUrl := fmt.Sprintf("/%s/users/update", db) }}
+    {{ deleteUrl := fmt.Sprintf("/%s/users/delete", db) }}
+    {{ user := handlers.GetMongoUser(id) }}
+
+    @Layout() {
+        <form action={ templ.SafeURL(updateUrl) } method="POST">
+            <input type="hidden" name="id" value={ id }>
+			<input class="input" type="text" name="username" placeholder="Username" value={ user.Username }>
+			<input class="input" type="text" name="firstName" placeholder="First Name" value={ user.FirstName }>
+			<input class="input" type="text" name="lastName" placeholder="Last Name" value={ user.LastName }>
+			<button class="button" type="submit">Update User</button>
+		</form>
+        <table class="table m-auto is-fullwidth">
+            <thead>
+                <tr>
+                    <th>
+                        <p>Id</p>
+                    </th> 
+                    <th>
+                        <p>Username</p>
+                    </th> 
+                    <th>
+                        <p>First Name</p>
+                    </th> 
+                    <th>
+                        <p>Last Name</p>
+                    </th> 
+                    <th >
+                        <p>Delete</p>
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>
+                        <p>{ id }</p>
+                    </td>
+                    <td>
+                        <p>{ user.Username }</p>
+                    </td>
+                    <td>
+                        <p>{ user.FirstName }</p>
+                    </td>
+                    <td>
+                        <p>{ user.LastName }</p>
+                    </td>
+                    <td>
+                        <form action={ templ.SafeURL(deleteUrl) } method="POST">
+                            <input type="hidden" name="id" value={ user.MongoId.Hex() }>
+                            <button class="button is-danger is-small">Delete</button>
+                        </form>
+                    </td>
+                </tr>
+            </tbody>
+        </table> 
+    }
+}
