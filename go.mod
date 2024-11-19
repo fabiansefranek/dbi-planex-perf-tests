@@ -4,6 +4,7 @@ go 1.23.2
 
 require (
 	github.com/a-h/templ v0.2.793
+	github.com/go-echarts/go-echarts/v2 v2.4.5
 	github.com/jackc/pgx/v5 v5.7.1
 	github.com/jedib0t/go-pretty/v6 v6.6.1
 	github.com/testcontainers/testcontainers-go v0.34.0
@@ -28,7 +29,6 @@ require (
 	github.com/docker/go-units v0.5.0 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-echarts/go-echarts v1.0.0 // indirect
-	github.com/go-echarts/go-echarts/v2 v2.4.5 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-ole/go-ole v1.2.6 // indirect

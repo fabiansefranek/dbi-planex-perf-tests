@@ -83,10 +83,6 @@ func main() {
 		panic(err)
 	}
 
-	StartServer()
-
-	return
-
 	mongoAtlasConn, err := ConnectMongoDB(atlasConnectionString, true)
 	if err != nil {
 		panic(err)
@@ -101,7 +97,7 @@ func main() {
 
 	/* --- PERFORMANCE TESTS --- */
 
-	sizes := []int{100, 1000/*, 10000*/} // TODO: Recompile charts!
+	sizes := []int{100, 1000, 10000} // TODO: Recompile charts!
 	tableRows := make([][]string, 0)
 
 	postgresInsertData, mongoInsertData := make([]opts.LineData, 0), make([]opts.LineData, 0)
@@ -328,6 +324,7 @@ func main() {
 		tableRows = append(tableRows, []string{})
 
 		println("Finished test size ", size)
+
 	}
 
 	PrintTable(tableRows)
@@ -348,7 +345,8 @@ func main() {
 
 	println("Performance tests finished")
 
-	time.Sleep(1 * time.Hour) 
+
+	StartServer()
 }
 
 /* POSTGRES */
