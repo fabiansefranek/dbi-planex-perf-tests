@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/a-h/templ"
 	"github.com/fabiansefranek/dbi-perf-tests/handlers"
 	"github.com/fabiansefranek/dbi-perf-tests/views"
 )
@@ -15,7 +14,11 @@ func StartServer() {
 
 	/* POSTGRES */
 
-	http.Handle("/", templ.Handler(views.PostgresIndex()))
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		nameSearch := r.URL.Query().Get("name")
+
+		views.PostgresIndex(nameSearch).Render(r.Context(), w)
+	})
 
 	http.Handle("POST /postgres/users", http.HandlerFunc(handlers.AddUser))
 	http.Handle("POST /postgres/users/delete", http.HandlerFunc(handlers.DeleteUser))
@@ -58,7 +61,11 @@ func StartServer() {
 
 	/* MONGODB */
 
-	http.Handle("/mongo", templ.Handler(views.MongoIndex()))
+	http.HandleFunc("/mongo", func(w http.ResponseWriter, r *http.Request) {
+		nameSearch := r.URL.Query().Get("name")
+
+		views.MongoIndex(nameSearch).Render(r.Context(), w)
+	})
 
 	http.Handle("POST /mongo/users", http.HandlerFunc(handlers.AddMongoUser))
 	http.Handle("POST /mongo/users/delete", http.HandlerFunc(handlers.DeleteMongoUser))

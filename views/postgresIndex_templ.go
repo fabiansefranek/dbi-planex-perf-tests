@@ -13,7 +13,7 @@ import (
 	"github.com/fabiansefranek/dbi-perf-tests/handlers"
 )
 
-func PostgresIndex() templ.Component {
+func PostgresIndex(nameSearch string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -36,7 +36,7 @@ func PostgresIndex() templ.Component {
 		ctx = templ.ClearChildren(ctx)
 		users := handlers.GetUsers()
 		sprints := handlers.GetSprints()
-		projects := handlers.GetProjects()
+		projects := handlers.GetProjects(nameSearch)
 		templ_7745c5c3_Var2 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
@@ -57,7 +57,37 @@ func PostgresIndex() templ.Component {
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(" <br><hr><br><p class=\"title is-4\">Projects</p><form action=\"/postgres/projects\" method=\"POST\"><div style=\"display: flex; flex-direction:row; justify-content: space-between;\"><input class=\"input\" type=\"text\" name=\"name\" placeholder=\"Project Name\" required> <input class=\"input\" type=\"text\" name=\"identifier\" placeholder=\"Identifier\" required> <input class=\"input\" type=\"text\" name=\"invite_code\" placeholder=\"Invite Code\" required> <input class=\"input\" type=\"number\" name=\"sprint_duration\" placeholder=\"Sprint Duration\" required> <input class=\"input\" type=\"number\" name=\"owner_id\" placeholder=\"Owner Id\" required></div><button class=\"button\" type=\"submit\">Add Project</button></form>")
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(" <br><hr><br><div style=\"display: flex; flex-direction:row; justify-content: space-between; gap: 1rem;\"><input class=\"input\" type=\"text\" id=\"nameSearch\" placeholder=\"Search by Project Name\" value=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var3 string
+			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(nameSearch)
+			if templ_7745c5c3_Err != nil {
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `views/postgresIndex.templ`, Line: 30, Col: 116}
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\"> ")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			templ_7745c5c3_Err = templ.RenderScriptItems(ctx, templ_7745c5c3_Buffer, SearchPostgres())
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("<button class=\"button\" type=\"submit\" onclick=\"")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			var templ_7745c5c3_Var4 templ.ComponentScript = SearchPostgres()
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ_7745c5c3_Var4.Call)
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString("\">Search</button></div><br><p class=\"title is-4\">Projects</p><form action=\"/postgres/projects\" method=\"POST\"><div style=\"display: flex; flex-direction:row; justify-content: space-between;\"><input class=\"input\" type=\"text\" name=\"name\" placeholder=\"Project Name\" required> <input class=\"input\" type=\"text\" name=\"identifier\" placeholder=\"Identifier\" required> <input class=\"input\" type=\"text\" name=\"invite_code\" placeholder=\"Invite Code\" required> <input class=\"input\" type=\"number\" name=\"sprint_duration\" placeholder=\"Sprint Duration\" required> <input class=\"input\" type=\"number\" name=\"owner_id\" placeholder=\"Owner Id\" required></div><button class=\"button\" type=\"submit\">Add Project</button></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -81,6 +111,18 @@ func PostgresIndex() templ.Component {
 		}
 		return templ_7745c5c3_Err
 	})
+}
+
+func SearchPostgres() templ.ComponentScript {
+	return templ.ComponentScript{
+		Name: `__templ_SearchPostgres_99b7`,
+		Function: `function __templ_SearchPostgres_99b7(){const nameSearchInput = document.getElementById("nameSearch")
+    const nameSearch = nameSearchInput.value
+    window.location.href=` + "`" + `/postgres?name=${nameSearch}` + "`" + `
+}`,
+		Call:       templ.SafeScript(`__templ_SearchPostgres_99b7`),
+		CallInline: templ.SafeScriptInline(`__templ_SearchPostgres_99b7`),
+	}
 }
 
 var _ = templruntime.GeneratedTemplate

@@ -5,10 +5,10 @@ import (
 	"github.com/fabiansefranek/dbi-perf-tests/handlers"
 )
 
-templ MongoIndex() {
+templ MongoIndex(nameSearch string) {
     {{ users := handlers.GetMongoUsers() }}
     {{ sprints := handlers.GetMongoSprints() }}
-    {{ projects := handlers.GetMongoProjects() }}
+    {{ projects := handlers.GetMongoProjects(nameSearch) }}
 
     @Layout() { 
          <p class="title is-4">Users</p>
@@ -24,6 +24,13 @@ templ MongoIndex() {
 
         <br>
         <hr>
+        <br>
+
+        <div style="display: flex; flex-direction:row; justify-content: space-between; gap: 1rem;">
+            <input class="input" type="text" id="nameSearch" placeholder="Search by Project Name" value={ nameSearch }>
+            <button class="button" type="submit" onclick={ SearchMongo() }>Search</button>
+        </div>
+
         <br>
 
         <p class="title is-4">Projects</p>
@@ -55,4 +62,10 @@ templ MongoIndex() {
 		</form>
         @components.Table("mongo", "sprints", []string{"Id", "Sprint Name", "Start Date", "End Date", "Project Id"}, sprints)        
     }
+}
+
+script SearchMongo() {
+    const nameSearchInput = document.getElementById("nameSearch")
+    const nameSearch = nameSearchInput.value
+    window.location.href=`/mongo?name=${nameSearch}`
 }

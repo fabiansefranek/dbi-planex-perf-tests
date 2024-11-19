@@ -5,10 +5,10 @@ import (
 	"github.com/fabiansefranek/dbi-perf-tests/handlers"
 )
 
-templ PostgresIndex() {
+templ PostgresIndex(nameSearch string) {
     {{ users := handlers.GetUsers() }}
     {{ sprints := handlers.GetSprints() }}
-    {{ projects := handlers.GetProjects() }}
+    {{ projects := handlers.GetProjects(nameSearch) }}
 
     @Layout() { 
          <p class="title is-4">Users</p>
@@ -24,6 +24,13 @@ templ PostgresIndex() {
 
         <br>
         <hr>
+        <br>
+
+        <div style="display: flex; flex-direction:row; justify-content: space-between; gap: 1rem;">
+            <input class="input" type="text" id="nameSearch" placeholder="Search by Project Name" value={ nameSearch }>
+            <button class="button" type="submit" onclick={ SearchPostgres() }>Search</button>
+        </div>
+
         <br>
 
         <p class="title is-4">Projects</p>
@@ -57,4 +64,10 @@ templ PostgresIndex() {
 
         
     }
+}
+
+script SearchPostgres() {
+    const nameSearchInput = document.getElementById("nameSearch")
+    const nameSearch = nameSearchInput.value
+    window.location.href=`/postgres?name=${nameSearch}`
 }

@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func AddProject(w http.ResponseWriter, r *http.Request) {
@@ -42,8 +43,29 @@ func AddProject(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusTemporaryRedirect)
 }
 
-func GetProjects() (projects [][]string) {
-	rows, err := db.PostgresConn.Query(context.Background(), `select * from projects`)
+func GetProjects(nameSearch string) (projects [][]string) {
+	var query string
+
+	if nameSearch != "" {
+		query = `select * from projects where name like $1`
+	} else {
+		query = `select * from projects`
+	}
+
+	var err error
+	var rows pgx.Rows
+
+	if nameSearch != "" {
+		rows, err = db.PostgresConn.Query(context.Background(), query, nameSearch)
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		rows, err = db.PostgresConn.Query(context.Background(), query)
+		if err != nil {
+			panic(err)
+		}
+	}
 
 	if err != nil {
 		panic(err)
@@ -162,11 +184,22 @@ func AddMongoProject(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/mongo", http.StatusTemporaryRedirect)
 }
 
-func GetMongoProjects() (projects [][]string) {
-	cursor, err := db.MongoConn.Database("test").Collection("projects").Find(context.Background(), bson.M{})
-	if err != nil {
-		panic(err)
+func GetMongoProjects(nameSearch string) (projects [][]string) {
+	var cursor *mongo.Cursor
+	var err error
+
+	if nameSearch != "" {
+		cursor, err = db.MongoConn.Database("test").Collection("projects").Find(context.Background(), bson.M{"name": bson.M{"$regex": nameSearch}})
+		if err != nil {
+			panic(err)
+		}
+	} else {
+		cursor, err = db.MongoConn.Database("test").Collection("projects").Find(context.Background(), bson.M{})
+		if err != nil {
+			panic(err)
+		}
 	}
+
 	defer cursor.Close(context.Background())
 
 	for cursor.Next(context.Background()) {
